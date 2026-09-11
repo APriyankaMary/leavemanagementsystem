@@ -1,0 +1,25 @@
+{
+  "name": "leave-status-notifications",
+  "version": "1.0.0",
+  "description": "Full-stack Leave Status Notification System with Real-Time In-App Alerts, Email Previews, and ServiceNow Integration (Zero-dependency, ready-to-run)",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": [
+    "leave-management",
+    "notifications",
+    "in-app-notifications",
+    "email-notifications",
+    "servicenow",
+    "real-time",
+    "sse",
+    "vanilla-js",
+    "zero-dependency"
+  ],
+  "author": "Arockia Doss",
+  "license": "MIT",
+  "dependencies": {}
+}

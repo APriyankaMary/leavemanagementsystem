@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Leave Status Notifications - HR Enterprise Portal</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- App Header -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand-group">
+        <div class="brand-logo">
+          <span class="logo-icon">🔔</span>
+        </div>
+        <div>
+          <h1 class="brand-title">LeaveTrack <span class="brand-badge">Enterprise</span></h1>
+          <p class="brand-subtitle">Automated Multi-Channel Leave Status Notifications</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <!-- Live SSE Status Pill -->
+        <div id="connectionStatus" class="status-pill status-connected">
+          <span class="pulse-dot"></span>
+          <span id="connectionStatusText">Live Sync Active</span>
+        </div>
+
+        <!-- Persona Role Switcher -->
+        <div class="role-switcher">
+          <label for="personaSelect" class="role-label">Active Role:</label>
+          <select id="personaSelect" class="persona-dropdown">
+            <option value="employee">👨‍💻 Alex Johnson (Employee)</option>
+            <option value="manager">👩‍💼 Sarah Connor (Manager)</option>
+          </select>
+        </div>
+
+        <!-- Notification Bell Icon with Badge -->
+        <div class="notification-bell-wrapper">
+          <button id="notificationBellBtn" class="bell-btn" aria-label="View notifications">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+            </svg>
+            <span id="unreadCountBadge" class="unread-badge">0</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="main-container">
+    
+    <!-- KPI Metrics Strip -->
+    <section class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-meta">
+          <span class="kpi-label">Total Requests</span>
+          <span class="kpi-value" id="kpiTotalLeaves">0</span>
+        </div>
+        <span class="kpi-icon icon-blue">📋</span>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-meta">
+          <span class="kpi-label">Pending Approval</span>
+          <span class="kpi-value" id="kpiPendingLeaves">0</span>
+        </div>
+        <span class="kpi-icon icon-yellow">⏳</span>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-meta">
+          <span class="kpi-label">Approved Leaves</span>
+          <span class="kpi-value" id="kpiApprovedLeaves">0</span>
+        </div>
+        <span class="kpi-icon icon-green">✅</span>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-meta">
+          <span class="kpi-label">Notifications Sent</span>
+          <span class="kpi-value" id="kpiTotalNotifications">0</span>
+        </div>
+        <span class="kpi-icon icon-purple">🔔</span>
+      </div>
+    </section>
+
+    <!-- Navigation Tabs -->
+    <div class="tabs-nav">
+      <button class="tab-btn active" data-tab="leavesTab">
+        <span class="tab-icon">🌴</span> Leave Requests & Tracker
+      </button>
+      <button class="tab-btn" data-tab="emailTab">
+        <span class="tab-icon">✉️</span> Email Simulator Inbox <span id="emailTabCount" class="tab-counter">0</span>
+      </button>
+      <button class="tab-btn" data-tab="serviceNowTab">
+        <span class="tab-icon">🌐</span> ServiceNow API Payloads
+      </button>
+      <button class="tab-btn" data-tab="architectureTab">
+        <span class="tab-icon">⚙️</span> Notification Architecture
+      </button>
+    </div>
+
+    <!-- TAB 1: Leave Requests & Tracker -->
+    <section id="leavesTab" class="tab-pane active">
+      <div class="pane-header">
+        <div>
+          <h2 class="pane-title" id="portalRoleTitle">Employee Self-Service Portal</h2>
+          <p class="pane-subtitle" id="portalRoleSubtitle">Submit leave requests and receive automated real-time status updates.</p>
+        </div>
+        <div class="pane-actions">
+          <button id="openApplyModalBtn" class="btn btn-primary">
+            <span>+ Apply for Leave</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Filter Bar -->
+      <div class="filter-bar">
+        <div class="filter-group">
+          <button class="filter-chip active" data-filter="ALL">All (<span id="countAll">0</span>)</button>
+          <button class="filter-chip" data-filter="PENDING_APPROVAL">Pending (<span id="countPending">0</span>)</button>
+          <button class="filter-chip" data-filter="APPROVED">Approved (<span id="countApproved">0</span>)</button>
+          <button class="filter-chip" data-filter="REJECTED">Rejected (<span id="countRejected">0</span>)</button>
+          <button class="filter-chip" data-filter="CANCELLED">Cancelled (<span id="countCancelled">0</span>)</button>
+        </div>
+        <div class="filter-search">
+          <input type="text" id="leaveSearchInput" placeholder="Search by ID, reason, or dates..." class="search-input">
+        </div>
+      </div>
+
+      <!-- Requests Table / Card List -->
+      <div class="table-card">
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Reference ID</th>
+                <th>Leave Type</th>
+                <th>Dates & Duration</th>
+                <th>Requested By / Manager</th>
+                <th>Reason</th>
+                <th>Current Status</th>
+                <th class="text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="leavesTableBody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+        <div id="emptyLeavesState" class="empty-state hidden">
+          <div class="empty-icon">🏖️</div>
+          <h3>No Leave Requests Found</h3>
+          <p>Click "Apply for Leave" above to create a new leave application.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: Email Simulator Inbox -->
+    <section id="emailTab" class="tab-pane">
+      <div class="pane-header">
+        <div>
+          <h2 class="pane-title">Simulated Employee Email Inbox</h2>
+          <p class="pane-subtitle">Live inspection of rich responsive HTML notification emails triggered by leave status changes.</p>
+        </div>
+        <button id="refreshEmailsBtn" class="btn btn-secondary">
+          <span>🔄 Refresh Inbox</span>
+        </button>
+      </div>
+
+      <div class="email-client-container">
+        <!-- Email list preview pane -->
+        <div class="email-sidebar" id="emailSidebarList">
+          <!-- Dynamically populated email headers -->
+        </div>
+
+        <!-- Email full viewer pane -->
+        <div class="email-viewer-pane" id="emailViewerPane">
+          <div class="email-viewer-empty">
+            <span class="icon-large">📧</span>
+            <h3>Select an Email to Preview</h3>
+            <p>Click any email from the left pane to view its executive HTML layout and dispatch headers.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: ServiceNow Integration Payloads -->
+    <section id="serviceNowTab" class="tab-pane">
+      <div class="pane-header">
+        <div>
+          <h2 class="pane-title">ServiceNow Enterprise Integration Logs</h2>
+          <p class="pane-subtitle">Real-time REST API Table events sent to ServiceNow <code>sys_user_notification</code> and <code>sn_hr_core_case</code>.</p>
+        </div>
+      </div>
+
+      <div class="sn-console-card">
+        <div class="sn-console-header">
+          <div class="sn-status-dot"></div>
+          <span class="sn-endpoint">REST Target: https://acme-instance.service-now.com/api/now/table/sys_user_notification</span>
+        </div>
+        <div class="sn-log-list" id="serviceNowLogContainer">
+          <!-- Dynamically populated ServiceNow JSON events -->
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: Architecture Documentation -->
+    <section id="architectureTab" class="tab-pane">
+      <div class="pane-header">
+        <div>
+          <h2 class="pane-title">System Architecture & Notification Lifecycle</h2>
+          <p class="pane-subtitle">How multi-channel status updates flow seamlessly across In-App, Email, and ServiceNow.</p>
+        </div>
+      </div>
+
+      <div class="architecture-grid">
+        <div class="arch-card">
+          <div class="arch-header">
+            <span class="arch-badge badge-blue">Stage 1</span>
+            <h3>📝 Leave Applied</h3>
+          </div>
+          <p class="arch-desc">Employee submits request via web portal. System saves state as <code>PENDING_APPROVAL</code>.</p>
+          <ul class="arch-channels">
+            <li><strong>In-App:</strong> Immediate confirmation alert with sound chime.</li>
+            <li><strong>Email:</strong> "Confirmation: Leave Request Submitted" sent to employee.</li>
+            <li><strong>ServiceNow:</strong> Triggers <code>sn_hr_leave.request.submitted</code> event.</li>
+          </ul>
+        </div>
+
+        <div class="arch-card">
+          <div class="arch-header">
+            <span class="arch-badge badge-amber">Stage 2</span>
+            <h3>⏳ Pending Reminder</h3>
+          </div>
+          <p class="arch-desc">Automated reminder triggered when a request is waiting for manager review.</p>
+          <ul class="arch-channels">
+            <li><strong>In-App:</strong> Badge reminder in employee & manager notification drawer.</li>
+            <li><strong>Email:</strong> "Pending Review: Reminder" sent to employee & manager.</li>
+            <li><strong>ServiceNow:</strong> Escalation reminder logged in HRSD case queue.</li>
+          </ul>
+        </div>
+
+        <div class="arch-card">
+          <div class="arch-header">
+            <span class="arch-badge badge-green">Stage 3A</span>
+            <h3>✅ Leave Approved</h3>
+          </div>
+          <p class="arch-desc">Manager reviews and clicks Approve. Status changes to <code>APPROVED</code>.</p>
+          <ul class="arch-channels">
+            <li><strong>In-App:</strong> Instant green push toast and permanent notification history entry.</li>
+            <li><strong>Email:</strong> Branded approval email with calendar Out-of-Office advice.</li>
+            <li><strong>ServiceNow:</strong> Case state updated to <code>Closed Complete</code>.</li>
+          </ul>
+        </div>
+
+        <div class="arch-card">
+          <div class="arch-header">
+            <span class="arch-badge badge-red">Stage 3B</span>
+            <h3>❌ Leave Rejected</h3>
+          </div>
+          <p class="arch-desc">Manager rejects request with mandatory feedback reason. Status changes to <code>REJECTED</code>.</p>
+          <ul class="arch-channels">
+            <li><strong>In-App:</strong> Red alert toast displaying reason for rejection.</li>
+            <li><strong>Email:</strong> Formal rejection notification with manager remarks.</li>
+            <li><strong>ServiceNow:</strong> Case closed as <code>Rejected</code> with audit reason.</li>
+          </ul>
+        </div>
+
+        <div class="arch-card">
+          <div class="arch-header">
+            <span class="arch-badge badge-slate">Stage 4</span>
+            <h3>⚪ Leave Cancelled</h3>
+          </div>
+          <p class="arch-desc">Employee cancels an approved or pending leave. Status updates to <code>CANCELLED</code>.</p>
+          <ul class="arch-channels">
+            <li><strong>In-App:</strong> Cancellation receipt alert and balance restored.</li>
+            <li><strong>Email:</strong> "Leave Cancelled" confirmation with freed balance details.</li>
+            <li><strong>ServiceNow:</strong> HR case cancelled and calendar reservation released.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Slide-out Notification Drawer -->
+  <aside id="notificationDrawer" class="notification-drawer">
+    <div class="drawer-header">
+      <div class="drawer-title-group">
+        <h3>🔔 Notifications Center</h3>
+        <span id="drawerUnreadCount" class="badge badge-pill">0 unread</span>
+      </div>
+      <div class="drawer-header-actions">
+        <button id="markAllReadBtn" class="btn btn-sm btn-ghost">Mark all as read</button>
+        <button id="closeDrawerBtn" class="btn-close" aria-label="Close drawer">&times;</button>
+      </div>
+    </div>
+    <div class="drawer-body" id="drawerNotificationsList">
+      <!-- Populated dynamically -->
+    </div>
+  </aside>
+  <div id="drawerBackdrop" class="drawer-backdrop"></div>
+
+  <!-- Modal: Apply for Leave -->
+  <div id="applyModal" class="modal">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>🌴 Apply for Leave</h3>
+          <button id="closeApplyModalBtn" class="btn-close">&times;</button>
+        </div>
+        <form id="applyLeaveForm">
+          <div class="modal-body">
+            <div class="form-group">
+              <label for="leaveTypeSelect">Leave Type *</label>
+              <select id="leaveTypeSelect" class="form-control" required>
+                <option value="Annual Leave">Annual Leave (Vacation)</option>
+                <option value="Sick Leave">Sick Leave</option>
+                <option value="Casual Leave">Casual Leave</option>
+                <option value="Maternity / Paternity Leave">Maternity / Paternity Leave</option>
+                <option value="Compensatory Off">Compensatory Off</option>
+              </select>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group col">
+                <label for="startDateInput">Start Date *</label>
+                <input type="date" id="startDateInput" class="form-control" required>
+              </div>
+              <div class="form-group col">
+                <label for="endDateInput">End Date *</label>
+                <input type="date" id="endDateInput" class="form-control" required>
+              </div>
+            </div>
+
+            <div class="days-indicator-box">
+              <span>Calculated Leave Duration:</span>
+              <strong id="calculatedDaysText">1 day(s)</strong>
+            </div>
+
+            <div class="form-group">
+              <label for="leaveReasonInput">Reason / Remarks *</label>
+              <textarea id="leaveReasonInput" rows="3" class="form-control" placeholder="Briefly state the reason for this leave request..." required></textarea>
+            </div>
+
+            <div class="info-callout">
+              🔔 <strong>Automated Notifications:</strong> Submitting this request will automatically alert your manager (Sarah Connor) and send a confirmation email to your inbox.
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" id="cancelApplyModalBtn" class="btn btn-secondary">Cancel</button>
+            <button type="submit" id="submitApplyBtn" class="btn btn-primary">Submit Leave Application</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Manager Action (Approve / Reject) -->
+  <div id="managerActionModal" class="modal">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="managerModalTitle">Review Leave Request</h3>
+          <button id="closeManagerModalBtn" class="btn-close">&times;</button>
+        </div>
+        <form id="managerActionForm">
+          <input type="hidden" id="actionLeaveId">
+          <input type="hidden" id="actionType">
+          <div class="modal-body">
+            <p id="managerModalDesc" class="modal-desc"></p>
+
+            <div class="form-group">
+              <label id="managerNoteLabel" for="managerNoteInput">Remarks / Reason *</label>
+              <textarea id="managerNoteInput" rows="3" class="form-control" placeholder="Provide comments or rationale for this decision..."></textarea>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" id="cancelManagerModalBtn" class="btn btn-secondary">Cancel</button>
+            <button type="submit" id="submitManagerActionBtn" class="btn btn-primary">Confirm Decision</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Real-Time Toast Container -->
+  <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
+  <!-- Frontend Scripts -->
+  <script src="js/api.js"></script>
+  <script src="js/notifications.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
